@@ -1,0 +1,12 @@
+# SPA fallback for GoDaddy (Apache): serve index.html for client-side routes
+RewriteEngine On
+RewriteBase /
+RewriteRule ^events/?$ /index.html [L]
+RewriteRule ^about/?$ /index.html [L]
+RewriteRule ^services/?$ /index.html [L]
+RewriteRule ^contact/?$ /index.html [L]
+RewriteRule ^sanskars/?$ /index.html [L]
+# Don't rewrite existing files or directories
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /index.html [L]
