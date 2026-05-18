@@ -14,7 +14,7 @@
  */
 
 const SPREADSHEET_ID = '1gVNnWbHTmAFD-tlzuWF7_aXspuDzeO7lHXfx0hWt6qE';
-const SHEET_SECRET = 'CHANGE_ME_TO_A_LONG_RANDOM_STRING';
+const SHEET_SECRET = 'lsht-recurring-7f3a9c2e1b8d4f6a0e5c';
 
 const HEADERS = [
   'Submitted At',
@@ -23,15 +23,23 @@ const HEADERS = [
   'Address',
   'Phone',
   'Email',
-  'ZIP Code & Place',
+  'ZIP',
   'Bank Account (IBAN)',
   'Monthly Amount (EUR)',
   'Starting Date',
-  'Place',
-  'Signature Date',
+  'Authorization Period',
+  'Date Signed',
   'Signature',
   'Authorized',
 ];
+
+function doGet() {
+  return jsonResponse({
+    success: true,
+    message: 'Recurring donation webhook is running.',
+    spreadsheetId: SPREADSHEET_ID,
+  });
+}
 
 function doPost(e) {
   try {
@@ -57,7 +65,7 @@ function doPost(e) {
       payload.bankAccount || '',
       payload.monthlyAmount || '',
       payload.startingDate || '',
-      payload.place || '',
+      payload.authorizationPeriod || payload.authorizationPeriodLabel || '',
       payload.signatureDate || '',
       payload.signature || '',
       payload.authorized ? 'Yes' : 'No',

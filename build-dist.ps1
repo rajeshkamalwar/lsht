@@ -56,7 +56,10 @@ $apiSrc = Join-Path $root "api"
 $apiDst = Join-Path $dist "api"
 if (Test-Path $apiSrc) {
     if (-not (Test-Path $apiDst)) { New-Item -ItemType Directory -Path $apiDst | Out-Null }
-    Get-ChildItem $apiSrc -File | Where-Object { $_.Name -ne 'sheets-config.example.php' } | ForEach-Object {
+    Get-ChildItem $apiSrc -File | Where-Object {
+        $_.Name -notin @('sheets-config.example.php', 'smtp-config.example.php') -and
+        $_.Name -notmatch '^_'
+    } | ForEach-Object {
         Copy-Item $_.FullName (Join-Path $apiDst $_.Name) -Force
     }
   Write-Host "  api/" -ForegroundColor Green
@@ -65,6 +68,11 @@ $sheetsConfig = Join-Path $root "api\sheets-config.php"
 if (Test-Path $sheetsConfig) {
     Copy-Item $sheetsConfig (Join-Path $apiDst "sheets-config.php") -Force
     Write-Host "  api/sheets-config.php" -ForegroundColor Green
+}
+$smtpConfig = Join-Path $root "api\smtp-config.php"
+if (Test-Path $smtpConfig) {
+    Copy-Item $smtpConfig (Join-Path $apiDst "smtp-config.php") -Force
+    Write-Host "  api/smtp-config.php" -ForegroundColor Green
 }
 
 # .htaccess for GoDaddy (Apache) - SPA fallback
@@ -79,6 +87,10 @@ RewriteRule ^services/?$ /index.html [L]
 RewriteRule ^contact/?$ /index.html [L]
 RewriteRule ^sanskars/?$ /index.html [L]
 RewriteRule ^donate/?$ /index.html [L]
+# Block direct HTTP access to secret config files
+<FilesMatch "^(smtp-config|sheets-config)\.php$">
+  Require all denied
+</FilesMatch>
 # Do not rewrite files or directories that exist on disk
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

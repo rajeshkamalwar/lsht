@@ -1205,11 +1205,136 @@
         .tw-sig-preview.visible { display:block; margin-left:auto; margin-right:auto; }
         .tw-sig-hint { font-size:10px; color:#6b4f74; margin:6px 0 0; line-height:1.4; }
         .tw-sig-error { font-size:10px; color:#b42318; margin-top:4px; min-height:14px; }
+        .tw-duration-options { display:flex; flex-direction:column; gap:6px; }
+        .tw-duration-opt { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1.5px solid #d7c7de; border-radius:8px; background:#fff; cursor:pointer; font-size:13px; color:#2b1a2e; }
+        .tw-duration-opt:has(input:checked) { border-color:#4a1d52; background:#f7f2f9; }
+        .tw-duration-opt input { width:auto; margin:0; accent-color:#4a1d52; }
         .tw-field label.tw-req::after { content: ' *'; color:#c2410c; font-weight:700; }
         .tw-field.tw-invalid input, .tw-field.tw-invalid select, .tw-field.tw-invalid textarea { border-color:#c2410c; }
+        .tw-field.tw-invalid .tw-duration-opt { border-color:#c2410c; }
         .tw-signature-field.tw-invalid .tw-sig-canvas-wrap, .tw-signature-field.tw-invalid .tw-sig-upload-zone { border-color:#c2410c; }
         .tw-form-required-note { font-size:10px; color:#6b4f74; margin:0 0 10px; }
+        .tw-locate-hint { font-size:10px; color:#6b4f74; margin:5px 0 0; line-height:1.45; }
+        .tw-locate-link { background:none; border:none; padding:0; font:inherit; font-size:10px; font-weight:600; color:#4a1d52; text-decoration:underline; cursor:pointer; }
+        .tw-locate-link:hover:not(:disabled) { color:#3a1642; }
+        .tw-locate-link:disabled { opacity:0.65; cursor:wait; text-decoration:none; }
+        .tw-locate-status { font-size:10px; color:#5c4566; margin:4px 0 0; min-height:14px; line-height:1.4; }
+        .tw-locate-status.is-error { color:#b42318; }
+        .tw-recurring-form { position:relative; }
+        .tw-form-busy-overlay { position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(255,255,255,0.92); border-radius:8px; }
+        .tw-form-busy-overlay[hidden] { display:none !important; }
+        .tw-form-busy-panel { text-align:center; max-width:260px; }
+        .tw-form-busy-spinner { width:40px; height:40px; margin:0 auto 14px; border:3px solid #e8dce8; border-top-color:#4a1d52; border-radius:50%; animation:tw-form-spin 0.75s linear infinite; }
+        @keyframes tw-form-spin { to { transform:rotate(360deg); } }
+        .tw-form-busy-title { margin:0 0 6px; font-size:15px; font-weight:700; color:#4a1d52; }
+        .tw-form-busy-text { margin:0; font-size:11px; line-height:1.5; color:#5c4566; }
+        .tw-recurring-form.is-busy { pointer-events:none; }
     `;
+
+
+    function setRecurringFormBusy(form, busy) {
+        const overlay = form.querySelector('[data-role="recurring-busy"]');
+        form.classList.toggle('is-busy', !!busy);
+        if (overlay) {
+            overlay.hidden = !busy;
+            overlay.setAttribute('aria-hidden', busy ? 'false' : 'true');
+        }
+        if (busy) {
+            form.setAttribute('aria-busy', 'true');
+        } else {
+            form.removeAttribute('aria-busy');
+        }
+        form.querySelectorAll('input, select, textarea, button').forEach((el) => {
+            el.disabled = !!busy;
+        });
+    }
+
+
+    function bindRecurringAddressLocate(form) {
+        const addressInput = form.querySelector('#tw-address');
+        const zipInput = form.querySelector('#tw-zipCity');
+        const btn = form.querySelector('[data-action="locate-address"]');
+        const statusEl = form.querySelector('[data-address-locate-status]');
+        if (!addressInput || !btn) return;
+
+        function setStatus(msg, isError) {
+            if (!statusEl) return;
+            statusEl.textContent = msg || '';
+            statusEl.classList.toggle('is-error', !!isError);
+        }
+
+        function formatAddressFromNominatim(data) {
+            const a = data && data.address ? data.address : {};
+            const street = [a.road || a.pedestrian || a.footway || a.street, a.house_number].filter(Boolean).join(' ').trim();
+            const locality = a.suburb || a.neighbourhood || a.quarter || a.city_district || '';
+            if (street && locality) return street + ', ' + locality;
+            if (street) return street;
+            if (data && data.display_name) {
+                const short = String(data.display_name).split(',').slice(0, 3).join(',').trim();
+                return short;
+            }
+            return '';
+        }
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!navigator.geolocation) {
+                setStatus('Location is not supported in this browser. Please type your address.', true);
+                return;
+            }
+            btn.disabled = true;
+            setStatus('Finding your location…', false);
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    const url = 'https://nominatim.openstreetmap.org/reverse?lat=' + encodeURIComponent(lat)
+                        + '&lon=' + encodeURIComponent(lon) + '&format=json&addressdetails=1';
+                    fetch(url, {
+                        headers: {
+                            Accept: 'application/json',
+                            'Accept-Language': 'en',
+                        },
+                    })
+                        .then((res) => res.json())
+                        .then((data) => {
+                            const line = formatAddressFromNominatim(data);
+                            if (line) {
+                                addressInput.value = line;
+                                addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                addressInput.closest('.tw-field')?.classList.remove('tw-invalid');
+                            }
+                            const postcode = data.address && data.address.postcode ? data.address.postcode : '';
+                            if (postcode && zipInput && !zipInput.value.trim()) {
+                                zipInput.value = postcode;
+                                zipInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            if (line) {
+                                setStatus('Address filled from your location. Please check it is correct.', false);
+                            } else {
+                                setStatus('Could not determine a street address. Please type your address.', true);
+                            }
+                        })
+                        .catch(() => {
+                            setStatus('Could not look up your address. Please type it manually.', true);
+                        })
+                        .finally(() => {
+                            btn.disabled = false;
+                        });
+                },
+                (err) => {
+                    btn.disabled = false;
+                    const messages = {
+                        1: 'Location permission denied. Please allow location or type your address.',
+                        2: 'Location unavailable. Please type your address.',
+                        3: 'Location timed out. Please try again or type your address.',
+                    };
+                    setStatus(messages[err.code] || 'Could not get your location. Please type your address.', true);
+                },
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 }
+            );
+        });
+    }
 
 
     function bindRecurringSignature(form) {
@@ -1529,14 +1654,14 @@
                     </div>
                     <div class="tw-body">
                         <p class="tw-auth-box"><strong>LORD SHIVA HINDU TEMPLES — Authorization</strong><br>
-                        The undersigned grants authorisation until further notice to Foundation Lord Shiva Hindu Temples in Amsterdam to debit the bank account below periodically per month for donation, to temple account <strong>NL13 INGB 0006 5738 64</strong>.</p>
+                        The undersigned grants authorisation to Foundation Lord Shiva Hindu Temples in Amsterdam to debit the bank account below periodically per month for donation for the selected period, to temple account <strong>NL13 INGB 0006 5738 64</strong>.</p>
 
                         <form class="tw-recurring-form" data-form="recurring">
                             <p class="tw-form-required-note">Fields marked with <span style="color:#c2410c;font-weight:700">*</span> are required.</p>
                             <div class="tw-field-row">
                                 <div class="tw-field">
-                                    <label for="tw-salutation" class="tw-req">Title</label>
-                                    <select id="tw-salutation" name="salutation" required aria-required="true">
+                                    <label for="tw-salutation">Title</label>
+                                    <select id="tw-salutation" name="salutation">
                                         <option value="">Select</option>
                                         <option value="Mr">Mr</option>
                                         <option value="Ms">Ms</option>
@@ -1548,9 +1673,11 @@
                                     <input id="tw-fullName" name="fullName" type="text" required aria-required="true" placeholder="Name" />
                                 </div>
                             </div>
-                            <div class="tw-field">
+                            <div class="tw-field tw-address-field">
                                 <label for="tw-address" class="tw-req">Address</label>
-                                <input id="tw-address" name="address" type="text" required aria-required="true" placeholder="Street and number" />
+                                <input id="tw-address" name="address" type="text" required aria-required="true" placeholder="Street and number" autocomplete="street-address" />
+                                <p class="tw-locate-hint">Not sure? <button type="button" class="tw-locate-link" data-action="locate-address">Click here to use your location</button></p>
+                                <p class="tw-locate-status" data-address-locate-status role="status" aria-live="polite"></p>
                             </div>
                             <div class="tw-field-row">
                                 <div class="tw-field">
@@ -1563,8 +1690,8 @@
                                 </div>
                             </div>
                             <div class="tw-field">
-                                <label for="tw-zipCity" class="tw-req">ZIP code and place</label>
-                                <input id="tw-zipCity" name="zipCity" type="text" required aria-required="true" placeholder="1101 BB Amsterdam" />
+                                <label for="tw-zipCity">ZIP</label>
+                                <input id="tw-zipCity" name="zipCity" type="text" placeholder="1101 BB" />
                             </div>
                             <div class="tw-field">
                                 <label for="tw-bankAccount" class="tw-req">Bank account number (IBAN)</label>
@@ -1572,21 +1699,28 @@
                             </div>
                             <div class="tw-field">
                                 <label for="tw-monthlyAmount" class="tw-req">Amount per month (&euro;)</label>
-                                <input id="tw-monthlyAmount" name="monthlyAmount" type="number" min="1" step="0.01" required aria-required="true" placeholder="e.g. 25" />
-                            </div>
-                            <div class="tw-field-row">
-                                <div class="tw-field">
-                                    <label for="tw-startingDate" class="tw-req">Starting date</label>
-                                    <input id="tw-startingDate" name="startingDate" type="date" required aria-required="true" />
-                                </div>
-                                <div class="tw-field">
-                                    <label for="tw-place" class="tw-req">Place</label>
-                                    <input id="tw-place" name="place" type="text" required aria-required="true" placeholder="Amsterdam" />
-                                </div>
+                                <input id="tw-monthlyAmount" name="monthlyAmount" type="number" min="1" step="0.01" required aria-required="true" />
                             </div>
                             <div class="tw-field">
-                                <label for="tw-signatureDate" class="tw-req">Date</label>
-                                <input id="tw-signatureDate" name="signatureDate" type="date" required aria-required="true" value="${today}" />
+                                <label for="tw-startingDate" class="tw-req">Starting date</label>
+                                <input id="tw-startingDate" name="startingDate" type="date" required aria-required="true" />
+                            </div>
+                            <div class="tw-field">
+                                <span class="tw-req" style="display:block;font-size:11px;color:#6b4f74;margin-bottom:6px;">Authorization period</span>
+                                <div class="tw-duration-options" role="radiogroup" aria-label="Authorization period">
+                                    <label class="tw-duration-opt">
+                                        <input type="radio" name="authorizationPeriod" value="1_month" required aria-required="true" />
+                                        <span>1 month</span>
+                                    </label>
+                                    <label class="tw-duration-opt">
+                                        <input type="radio" name="authorizationPeriod" value="6_months" />
+                                        <span>6 months</span>
+                                    </label>
+                                    <label class="tw-duration-opt">
+                                        <input type="radio" name="authorizationPeriod" value="1_year" checked />
+                                        <span>1 year</span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="tw-field tw-signature-field">
                                 <label class="tw-req">Signature</label>
@@ -1623,6 +1757,13 @@
                             </label>
                             <button type="submit" class="tw-submit" data-action="recurring-submit">Submit authorization</button>
                             <div class="tw-form-status" data-role="recurring-status" role="status"></div>
+                            <div class="tw-form-busy-overlay" data-role="recurring-busy" hidden aria-hidden="true">
+                                <div class="tw-form-busy-panel">
+                                    <div class="tw-form-busy-spinner" aria-hidden="true"></div>
+                                    <p class="tw-form-busy-title">Please wait</p>
+                                    <p class="tw-form-busy-text">Sending your authorization&hellip; Do not close this page or click anything until finished.</p>
+                                </div>
+                            </div>
                         </form>
                     </div>
                     </div>
@@ -1806,6 +1947,7 @@
 
         if (recurringForm) {
             bindRecurringSignature(recurringForm);
+            bindRecurringAddressLocate(recurringForm);
             recurringForm.querySelectorAll('input, select, textarea').forEach(el => {
                 el.addEventListener('input', () => {
                     el.closest('.tw-field, .tw-signature-field')?.classList.remove('tw-invalid');
@@ -1835,16 +1977,14 @@
                     bankAccount: fd.get('bankAccount'),
                     monthlyAmount: fd.get('monthlyAmount'),
                     startingDate: fd.get('startingDate'),
-                    place: fd.get('place'),
-                    signatureDate: fd.get('signatureDate'),
+                    authorizationPeriod: fd.get('authorizationPeriod'),
                     signature: fd.get('signature'),
                     authorized: fd.get('authorized') === 'on',
                 };
-                const submitBtn = recurringForm.querySelector('[data-action="recurring-submit"]');
-                if (submitBtn) submitBtn.disabled = true;
+                setRecurringFormBusy(recurringForm, true);
                 if (recurringStatus) {
                     recurringStatus.className = 'tw-form-status';
-                    recurringStatus.textContent = 'Sending…';
+                    recurringStatus.textContent = '';
                 }
                 try {
                     const res = await fetch('/api/recurring-donation.php', {
@@ -1862,15 +2002,15 @@
                     }
                     recurringForm.reset();
                     if (recurringForm._sigReset) recurringForm._sigReset();
-                    const sigDate = recurringForm.querySelector('[name="signatureDate"]');
-                    if (sigDate) sigDate.value = today;
+                    const defaultPeriod = recurringForm.querySelector('[name="authorizationPeriod"][value="1_year"]');
+                    if (defaultPeriod) defaultPeriod.checked = true;
                 } catch (err) {
                     if (recurringStatus) {
                         recurringStatus.className = 'tw-form-status error';
                         recurringStatus.textContent = err.message || 'Could not submit. Please email info@shivatemple.nl.';
                     }
                 } finally {
-                    if (submitBtn) submitBtn.disabled = false;
+                    setRecurringFormBusy(recurringForm, false);
                 }
             });
         }

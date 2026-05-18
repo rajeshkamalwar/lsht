@@ -1,10 +1,9 @@
 <?php
 /**
- * Contact Form Handler for Hostinger Shared Hosting
- * 
- * This PHP script handles contact form submissions when Node.js is not available.
- * Configure your SMTP settings below or use PHP's mail() function.
+ * Contact form handler — sends via GoDaddy SMTP (api/smtp-config.php) or PHP mail() fallback.
  */
+
+require_once __DIR__ . '/mail-send.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -35,10 +34,7 @@ if (empty($name) || empty($email) || empty($subject) || empty($message)) {
     exit;
 }
 
-// Email configuration
-$to = 'info@shivatemple.nl'; // Change this to your email
-$from_email = $email;
-$from_name = $name;
+$to = 'info@shivatemple.nl';
 
 // Email to temple
 $email_subject = "New Contact Form Submission: " . $subject;
@@ -87,14 +83,13 @@ $email_body = "
 </html>
 ";
 
-// Email headers
-$headers = "MIME-Version: 1.0" . "\r\n";
-$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-$headers .= "From: {$from_name} <{$from_email}>" . "\r\n";
-$headers .= "Reply-To: {$from_email}" . "\r\n";
-
-// Send email to temple
-$mail_sent = mail($to, $email_subject, $email_body, $headers);
+$mail_sent = lsht_send_mail([
+    'to' => $to,
+    'subject' => $email_subject,
+    'html' => $email_body,
+    'reply_to_email' => $email,
+    'reply_to_name' => $name,
+]);
 
 // Confirmation email to user
 $confirmation_subject = "Confirmation: Your message to Lord Shiva Hindu Temples - " . $subject;
@@ -129,12 +124,11 @@ $confirmation_body = "
 </html>
 ";
 
-$confirmation_headers = "MIME-Version: 1.0" . "\r\n";
-$confirmation_headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-$confirmation_headers .= "From: Lord Shiva Hindu Temples <{$to}>" . "\r\n";
-
-// Send confirmation email
-mail($email, $confirmation_subject, $confirmation_body, $confirmation_headers);
+lsht_send_mail([
+    'to' => $email,
+    'subject' => $confirmation_subject,
+    'html' => $confirmation_body,
+]);
 
 if ($mail_sent) {
     echo json_encode(['success' => true, 'message' => 'Message sent successfully!']);

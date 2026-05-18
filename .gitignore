@@ -1,5 +1,6 @@
 dist/
 api/sheets-config.php
+api/smtp-config.php
 .DS_Store
 Thumbs.db
 *.log
