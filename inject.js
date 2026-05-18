@@ -1165,8 +1165,265 @@
         .tw-ing-hint { font-size:10px; color:#6b4f74; margin-top:8px; line-height:1.45; }
         .tw-copy-status { font-size:10px; color:#1e6b3a; margin-top:6px; min-height:14px; max-height:0; opacity:0; overflow:hidden; transition:opacity .2s, max-height .2s; }
         .tw-copy-status.visible { max-height:40px; opacity:1; }
+        .tw-tabs { display:flex; border-bottom:1px solid #e8dce8; background:#f7f2f9; }
+        .tw-tab { flex:1; padding:11px 8px; font-size:12px; font-weight:600; color:#6b4f74; background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .tw-tab:hover { color:#4a1d52; background:#efe6f2; }
+        .tw-tab.active { color:#4a1d52; background:#fff; border-bottom-color:#4a1d52; }
+        .tw-panel { display:none; }
+        .tw-panel.active { display:block; }
+        .tw-field { margin-bottom:10px; }
+        .tw-field label { display:block; font-size:11px; color:#6b4f74; margin-bottom:4px; }
+        .tw-field input, .tw-field select, .tw-field textarea { width:100%; padding:8px 10px; font-size:13px; color:#2b1a2e; border:1.5px solid #d7c7de; border-radius:8px; outline:none; font-family:inherit; background:#fff; }
+        .tw-field input:focus, .tw-field select:focus, .tw-field textarea:focus { border-color:#4a1d52; }
+        .tw-field-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        @media (max-width:400px) { .tw-field-row { grid-template-columns:1fr; } }
+        .tw-auth-box { font-size:10px; line-height:1.5; color:#5c4566; background:#f7f2f9; border:1px solid #e8dce8; border-radius:8px; padding:10px 12px; margin:10px 0; }
+        .tw-auth-box strong { color:#4a1d52; }
+        .tw-check { display:flex; align-items:flex-start; gap:8px; font-size:11px; color:#2b1a2e; margin:10px 0; cursor:pointer; }
+        .tw-check input { width:15px; height:15px; margin-top:2px; accent-color:#4a1d52; flex-shrink:0; }
+        .tw-submit { margin-top:10px; width:100%; padding:11px; border-radius:999px; background:#4a1d52; color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .tw-submit:hover:not(:disabled) { background:#3a1642; box-shadow:0 8px 16px -5px rgba(74,29,82,0.5); }
+        .tw-submit:disabled { opacity:0.65; cursor:not-allowed; }
+        .tw-form-status { font-size:11px; margin-top:8px; min-height:16px; line-height:1.45; }
+        .tw-form-status.error { color:#b42318; }
+        .tw-form-status.success { color:#1e6b3a; }
+        .tw-widget-injected .tw-card { max-height:min(85vh, 720px); overflow-y:auto; }
+        .tw-signature-field { margin-top:4px; }
+        .tw-sig-modes { display:flex; gap:6px; margin-bottom:8px; }
+        .tw-sig-mode { flex:1; padding:7px 10px; font-size:12px; font-weight:600; border:1.5px solid #d7c7de; border-radius:8px; background:#fff; color:#6b4f74; cursor:pointer; font-family:inherit; }
+        .tw-sig-mode.active { border-color:#4a1d52; color:#4a1d52; background:#f7f2f9; }
+        .tw-sig-panel { display:none; }
+        .tw-sig-panel.active { display:block; }
+        .tw-sig-canvas-wrap { border:1.5px solid #d7c7de; border-radius:8px; background:#fff; overflow:hidden; touch-action:none; }
+        .tw-sig-canvas { display:block; width:100%; height:120px; cursor:crosshair; }
+        .tw-sig-actions { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+        .tw-sig-btn { padding:5px 12px; font-size:11px; font-weight:600; border:1px solid #d7c7de; border-radius:6px; background:#fff; color:#4a1d52; cursor:pointer; font-family:inherit; }
+        .tw-sig-btn:hover { background:#f7f2f9; }
+        .tw-sig-upload-zone { border:1.5px dashed #d7c7de; border-radius:8px; padding:14px; text-align:center; background:#faf8fb; cursor:pointer; }
+        .tw-sig-upload-zone input { display:none; }
+        .tw-sig-preview { display:none; max-width:100%; max-height:120px; margin-top:8px; border:1px solid #e8dce8; border-radius:6px; }
+        .tw-sig-preview.visible { display:block; margin-left:auto; margin-right:auto; }
+        .tw-sig-hint { font-size:10px; color:#6b4f74; margin:6px 0 0; line-height:1.4; }
+        .tw-sig-error { font-size:10px; color:#b42318; margin-top:4px; min-height:14px; }
+        .tw-field label.tw-req::after { content: ' *'; color:#c2410c; font-weight:700; }
+        .tw-field.tw-invalid input, .tw-field.tw-invalid select, .tw-field.tw-invalid textarea { border-color:#c2410c; }
+        .tw-signature-field.tw-invalid .tw-sig-canvas-wrap, .tw-signature-field.tw-invalid .tw-sig-upload-zone { border-color:#c2410c; }
+        .tw-form-required-note { font-size:10px; color:#6b4f74; margin:0 0 10px; }
     `;
 
+
+    function bindRecurringSignature(form) {
+        const hidden = form.querySelector('[data-sig-value]');
+        const canvas = form.querySelector('.tw-sig-canvas');
+        const errEl = form.querySelector('[data-sig-error]');
+        const preview = form.querySelector('[data-sig-preview]');
+        const fileInput = form.querySelector('[data-sig-file]');
+        const uploadLabel = form.querySelector('[data-sig-upload-label]');
+        if (!hidden || !canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        let activeMode = 'draw';
+        let hasDrawn = false;
+        let drawing = false;
+        const cssW = 320;
+        const cssH = 120;
+
+        function showError(msg) {
+            if (errEl) errEl.textContent = msg || '';
+        }
+
+        function setSignature(dataUrl) {
+            hidden.value = dataUrl || '';
+            hidden.setCustomValidity(dataUrl ? '' : 'Please draw or upload your signature.');
+            showError('');
+        }
+
+        function setupCanvas() {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = Math.floor(cssW * ratio);
+            canvas.height = Math.floor(cssH * ratio);
+            canvas.style.width = cssW + 'px';
+            canvas.style.height = cssH + 'px';
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(ratio, ratio);
+            ctx.strokeStyle = '#2b1a2e';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cssW, cssH);
+        }
+
+        function clearDraw() {
+            setupCanvas();
+            hasDrawn = false;
+            if (activeMode === 'draw') setSignature('');
+        }
+
+        function canvasHasInk() {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (let i = 3; i < img.length; i += 4) {
+                if (img[i] > 0) {
+                    for (let j = i - 3; j < i; j++) {
+                        if (img[j] < 250) return true;
+                    }
+                }
+            }
+            return hasDrawn;
+        }
+
+        function exportCanvas() {
+            const out = document.createElement('canvas');
+            out.width = cssW;
+            out.height = cssH;
+            const octx = out.getContext('2d');
+            octx.fillStyle = '#ffffff';
+            octx.fillRect(0, 0, cssW, cssH);
+            octx.drawImage(canvas, 0, 0, cssW, cssH);
+            return out.toDataURL('image/jpeg', 0.88);
+        }
+
+        function pos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (cssW / rect.width),
+                y: (clientY - rect.top) * (cssH / rect.height),
+            };
+        }
+
+        function startDraw(e) {
+            if (activeMode !== 'draw') return;
+            e.preventDefault();
+            drawing = true;
+            const p = pos(e);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        }
+
+        function moveDraw(e) {
+            if (!drawing || activeMode !== 'draw') return;
+            e.preventDefault();
+            const p = pos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            hasDrawn = true;
+        }
+
+        function endDraw() {
+            if (!drawing) return;
+            drawing = false;
+            if (hasDrawn) setSignature(exportCanvas());
+        }
+
+        form.querySelectorAll('.tw-sig-mode').forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeMode = btn.dataset.sigMode;
+                form.querySelectorAll('.tw-sig-mode').forEach(b => {
+                    const on = b.dataset.sigMode === activeMode;
+                    b.classList.toggle('active', on);
+                    b.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                form.querySelectorAll('.tw-sig-panel').forEach(p => {
+                    p.classList.toggle('active', p.dataset.sigPanel === activeMode);
+                });
+                if (activeMode === 'draw' && hasDrawn) setSignature(exportCanvas());
+                else if (activeMode === 'draw' && !hasDrawn) setSignature('');
+            });
+        });
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', moveDraw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', endDraw);
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', moveDraw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+
+        form.querySelector('[data-action="sig-clear-draw"]')?.addEventListener('click', clearDraw);
+
+        form.querySelector('[data-action="sig-clear-upload"]')?.addEventListener('click', () => {
+            if (fileInput) fileInput.value = '';
+            if (preview) {
+                preview.src = '';
+                preview.classList.remove('visible');
+            }
+            if (uploadLabel) uploadLabel.textContent = 'Click to upload signature image (PNG, JPG, WebP — max 2 MB)';
+            if (activeMode === 'upload') setSignature('');
+        });
+
+        if (fileInput) {
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                    showError('Image must be 2 MB or smaller.');
+                    fileInput.value = '';
+                    return;
+                }
+                if (!/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+                    showError('Please upload a PNG, JPG, or WebP image.');
+                    fileInput.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const out = document.createElement('canvas');
+                        const scale = Math.min(1, cssW / img.width, cssH / img.height);
+                        out.width = Math.max(1, Math.round(img.width * scale));
+                        out.height = Math.max(1, Math.round(img.height * scale));
+                        const octx = out.getContext('2d');
+                        octx.fillStyle = '#ffffff';
+                        octx.fillRect(0, 0, out.width, out.height);
+                        octx.drawImage(img, 0, 0, out.width, out.height);
+                        const dataUrl = out.toDataURL('image/jpeg', 0.88);
+                        setSignature(dataUrl);
+                        if (preview) {
+                            preview.src = dataUrl;
+                            preview.classList.add('visible');
+                        }
+                        if (uploadLabel) uploadLabel.textContent = file.name;
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        form._sigSync = () => {
+            if (activeMode === 'draw') {
+                if (hasDrawn) setSignature(exportCanvas());
+                else setSignature('');
+            }
+        };
+
+        form._sigReset = () => {
+            clearDraw();
+            if (fileInput) fileInput.value = '';
+            if (preview) {
+                preview.src = '';
+                preview.classList.remove('visible');
+            }
+            if (uploadLabel) uploadLabel.textContent = 'Click to upload signature image (PNG, JPG, WebP — max 2 MB)';
+            setSignature('');
+            activeMode = 'draw';
+            form.querySelectorAll('.tw-sig-mode').forEach(b => {
+                const on = b.dataset.sigMode === 'draw';
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            form.querySelectorAll('.tw-sig-panel').forEach(p => {
+                p.classList.toggle('active', p.dataset.sigPanel === 'draw');
+            });
+        };
+
+        setupCanvas();
+        setSignature('');
+    }
     function injectDonateHero() {
         if (!window.location.pathname.includes('/donate')) return;
 
@@ -1198,11 +1455,18 @@
         textCol.className = 'temple-hero-text-col text-center lg:text-left w-full';
         while (inner.firstChild) textCol.appendChild(inner.firstChild);
 
+        const today = new Date().toISOString().slice(0, 10);
         const widgetCol = document.createElement('div');
         widgetCol.className = 'temple-widget-injected';
         widgetCol.innerHTML = `
             <div class="tw-widget">
                 <div class="tw-card">
+                    <div class="tw-tabs" role="tablist">
+                        <button type="button" class="tw-tab active" role="tab" aria-selected="true" data-tab="onetime">One-time donation</button>
+                        <button type="button" class="tw-tab" role="tab" aria-selected="false" data-tab="recurring">Recurring donation</button>
+                    </div>
+
+                    <div class="tw-panel active" data-panel="onetime" role="tabpanel">
                     <div class="tw-header">
                         <div class="tw-header-text">
                             <div class="tw-title">One-time donation</div>
@@ -1211,7 +1475,7 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
 
-                    <div class="tw-body">
+                    <div class="tw-body" data-onetime-body>
                         <div class="tw-label">Currency</div>
                         <select class="tw-select" data-field="currency">
                             <option>Euro (EUR)</option>
@@ -1231,11 +1495,8 @@
 
                         <div class="tw-label">Designation</div>
                         <select class="tw-select" data-field="designation">
-                            <option>General donation</option>
-                            <option>Deity worship</option>
-                            <option>Goshala</option>
-                            <option>Garden</option>
-                            <option>Kitchen</option>
+                            <option>General Donation</option>
+                            <option>Deity Worship</option>
                         </select>
 
                         <label class="tw-comment">
@@ -1253,9 +1514,117 @@
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                         </button>
                     </div>
-
                     <div class="tw-footer">
                         Secure payment via <a href="${TEMPLE_PAY_URL}" target="_blank" rel="noopener">ING Payment Request</a>
+                    </div>
+                    </div>
+
+                    <div class="tw-panel" data-panel="recurring" role="tabpanel">
+                    <div class="tw-header">
+                        <div class="tw-header-text">
+                            <div class="tw-title">Recurring donation</div>
+                            <div class="tw-header-sub">Monthly authorization (Machtiging)</div>
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <div class="tw-body">
+                        <p class="tw-auth-box"><strong>LORD SHIVA HINDU TEMPLES — Authorization</strong><br>
+                        The undersigned grants authorisation until further notice to Foundation Lord Shiva Hindu Temples in Amsterdam to debit the bank account below periodically per month for donation, to temple account <strong>NL13 INGB 0006 5738 64</strong>.</p>
+
+                        <form class="tw-recurring-form" data-form="recurring">
+                            <p class="tw-form-required-note">Fields marked with <span style="color:#c2410c;font-weight:700">*</span> are required.</p>
+                            <div class="tw-field-row">
+                                <div class="tw-field">
+                                    <label for="tw-salutation" class="tw-req">Title</label>
+                                    <select id="tw-salutation" name="salutation" required aria-required="true">
+                                        <option value="">Select</option>
+                                        <option value="Mr">Mr</option>
+                                        <option value="Ms">Ms</option>
+                                        <option value="Mrs">Mrs</option>
+                                    </select>
+                                </div>
+                                <div class="tw-field">
+                                    <label for="tw-fullName" class="tw-req">Full name</label>
+                                    <input id="tw-fullName" name="fullName" type="text" required aria-required="true" placeholder="Name" />
+                                </div>
+                            </div>
+                            <div class="tw-field">
+                                <label for="tw-address" class="tw-req">Address</label>
+                                <input id="tw-address" name="address" type="text" required aria-required="true" placeholder="Street and number" />
+                            </div>
+                            <div class="tw-field-row">
+                                <div class="tw-field">
+                                    <label for="tw-phone" class="tw-req">Phone</label>
+                                    <input id="tw-phone" name="phone" type="tel" required aria-required="true" placeholder="+31 ..." />
+                                </div>
+                                <div class="tw-field">
+                                    <label for="tw-email" class="tw-req">Email</label>
+                                    <input id="tw-email" name="email" type="email" required aria-required="true" placeholder="you@email.com" />
+                                </div>
+                            </div>
+                            <div class="tw-field">
+                                <label for="tw-zipCity" class="tw-req">ZIP code and place</label>
+                                <input id="tw-zipCity" name="zipCity" type="text" required aria-required="true" placeholder="1101 BB Amsterdam" />
+                            </div>
+                            <div class="tw-field">
+                                <label for="tw-bankAccount" class="tw-req">Bank account number (IBAN)</label>
+                                <input id="tw-bankAccount" name="bankAccount" type="text" required aria-required="true" placeholder="NL00 BANK 0000 0000 00" />
+                            </div>
+                            <div class="tw-field">
+                                <label for="tw-monthlyAmount" class="tw-req">Amount per month (&euro;)</label>
+                                <input id="tw-monthlyAmount" name="monthlyAmount" type="number" min="1" step="0.01" required aria-required="true" placeholder="e.g. 25" />
+                            </div>
+                            <div class="tw-field-row">
+                                <div class="tw-field">
+                                    <label for="tw-startingDate" class="tw-req">Starting date</label>
+                                    <input id="tw-startingDate" name="startingDate" type="date" required aria-required="true" />
+                                </div>
+                                <div class="tw-field">
+                                    <label for="tw-place" class="tw-req">Place</label>
+                                    <input id="tw-place" name="place" type="text" required aria-required="true" placeholder="Amsterdam" />
+                                </div>
+                            </div>
+                            <div class="tw-field">
+                                <label for="tw-signatureDate" class="tw-req">Date</label>
+                                <input id="tw-signatureDate" name="signatureDate" type="date" required aria-required="true" value="${today}" />
+                            </div>
+                            <div class="tw-field tw-signature-field">
+                                <label class="tw-req">Signature</label>
+                                <div class="tw-sig-modes" role="tablist">
+                                    <button type="button" class="tw-sig-mode active" data-sig-mode="draw" aria-selected="true">Draw signature</button>
+                                    <button type="button" class="tw-sig-mode" data-sig-mode="upload" aria-selected="false">Upload image</button>
+                                </div>
+                                <div class="tw-sig-panel active" data-sig-panel="draw">
+                                    <div class="tw-sig-canvas-wrap">
+                                        <canvas class="tw-sig-canvas" aria-label="Draw your signature"></canvas>
+                                    </div>
+                                    <div class="tw-sig-actions">
+                                        <button type="button" class="tw-sig-btn" data-action="sig-clear-draw">Clear drawing</button>
+                                    </div>
+                                </div>
+                                <div class="tw-sig-panel" data-sig-panel="upload">
+                                    <label class="tw-sig-upload-zone">
+                                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" data-sig-file />
+                                        <span data-sig-upload-label>Click to upload signature image (PNG, JPG, WebP — max 2 MB)</span>
+                                    </label>
+                                    <img class="tw-sig-preview" alt="Uploaded signature preview" data-sig-preview />
+                                    <div class="tw-sig-actions">
+                                        <button type="button" class="tw-sig-btn" data-action="sig-clear-upload">Remove image</button>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="signature" data-sig-value required aria-required="true" />
+                                <p class="tw-sig-hint">Sign with your mouse or finger, or upload a photo of your signature.</p>
+                                <p class="tw-sig-error" data-sig-error role="alert"></p>
+                            </div>
+
+                            <label class="tw-check">
+                                <input type="checkbox" name="authorized" required />
+                                <span>I confirm the information above is correct and I authorise the recurring monthly debit as described.</span>
+                            </label>
+                            <button type="submit" class="tw-submit" data-action="recurring-submit">Submit authorization</button>
+                            <div class="tw-form-status" data-role="recurring-status" role="status"></div>
+                        </form>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -1264,6 +1633,8 @@
         inner.appendChild(textCol);
         inner.appendChild(widgetCol);
 
+        const onetimePanel = widgetCol.querySelector('[data-panel="onetime"]');
+
         function escapeHtml(t) {
             const d = document.createElement('div');
             d.textContent = t;
@@ -1271,7 +1642,7 @@
         }
 
         function readWidgetState() {
-            const customEl = widgetCol.querySelector('[data-field="custom"]');
+            const customEl = onetimePanel.querySelector('[data-field="custom"]');
             const rawCustom = customEl && customEl.value.trim() ? customEl.value.trim() : '';
             let amount = '';
             if (rawCustom) {
@@ -1279,14 +1650,14 @@
                 amount = !Number.isNaN(n) && n > 0 ? String(Math.round(n * 100) / 100) : '';
             }
             if (!amount) {
-                const amtBtn = widgetCol.querySelector('[data-group="amount"] button.active');
+                const amtBtn = onetimePanel.querySelector('[data-group="amount"] button.active');
                 amount = amtBtn ? amtBtn.dataset.value : '';
             }
             if (!amount) amount = '21';
-            const des = widgetCol.querySelector('[data-field="designation"]')?.value || 'General donation';
-            const useComment = widgetCol.querySelector('[data-field="comment-toggle"]')?.checked;
+            const des = onetimePanel.querySelector('[data-field="designation"]')?.value || 'General Donation';
+            const useComment = onetimePanel.querySelector('[data-field="comment-toggle"]')?.checked;
             const comment = useComment
-                ? (widgetCol.querySelector('[data-field="comment"]')?.value?.trim() || '')
+                ? (onetimePanel.querySelector('[data-field="comment"]')?.value?.trim() || '')
                 : '';
             return { amount, des, comment };
         }
@@ -1301,7 +1672,7 @@
         }
 
         function updateSummary() {
-            const el = widgetCol.querySelector('[data-role="summary"]');
+            const el = onetimePanel.querySelector('[data-role="summary"]');
             if (!el) return;
             const s = readWidgetState();
             const noteBit = s.comment
@@ -1312,55 +1683,68 @@
 
         function bindSummaryUpdates() {
             const run = () => updateSummary();
-            widgetCol.querySelectorAll('[data-group] button').forEach(b => b.addEventListener('click', run));
-            const customInput = widgetCol.querySelector('[data-field="custom"]');
+            onetimePanel.querySelectorAll('[data-group] button').forEach(b => b.addEventListener('click', run));
+            const customInput = onetimePanel.querySelector('[data-field="custom"]');
             if (customInput) customInput.addEventListener('input', run);
-            const des = widgetCol.querySelector('[data-field="designation"]');
+            const des = onetimePanel.querySelector('[data-field="designation"]');
             if (des) des.addEventListener('change', run);
-            const commentBox = widgetCol.querySelector('[data-field="comment"]');
+            const commentBox = onetimePanel.querySelector('[data-field="comment"]');
             if (commentBox) commentBox.addEventListener('input', run);
-            const commentToggle = widgetCol.querySelector('[data-field="comment-toggle"]');
+            const commentToggle = onetimePanel.querySelector('[data-field="comment-toggle"]');
             if (commentToggle) commentToggle.addEventListener('change', run);
         }
 
-        // Wire up segmented toggles and amount pills
-        widgetCol.querySelectorAll('[data-group]').forEach(group => {
+        widgetCol.querySelectorAll('.tw-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const id = tab.dataset.tab;
+                widgetCol.querySelectorAll('.tw-tab').forEach(t => {
+                    const on = t.dataset.tab === id;
+                    t.classList.toggle('active', on);
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                widgetCol.querySelectorAll('.tw-panel').forEach(p => {
+                    p.classList.toggle('active', p.dataset.panel === id);
+                });
+            });
+        });
+
+        onetimePanel.querySelectorAll('[data-group]').forEach(group => {
             group.querySelectorAll('button').forEach(btn => {
                 btn.addEventListener('click', () => {
                     group.querySelectorAll('button').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     if (group.dataset.group === 'amount') {
-                        const customInput = widgetCol.querySelector('[data-field="custom"]');
+                        const customInput = onetimePanel.querySelector('[data-field="custom"]');
                         if (customInput) customInput.value = '';
                     }
                 });
             });
         });
 
-        const customInput = widgetCol.querySelector('[data-field="custom"]');
+        const customInput = onetimePanel.querySelector('[data-field="custom"]');
         if (customInput) {
             customInput.addEventListener('input', () => {
                 if (customInput.value) {
-                    widgetCol.querySelectorAll('[data-group="amount"] button')
+                    onetimePanel.querySelectorAll('[data-group="amount"] button')
                         .forEach(b => b.classList.remove('active'));
                 }
             });
         }
 
-        const commentToggle = widgetCol.querySelector('[data-field="comment-toggle"]');
-        const commentBox = widgetCol.querySelector('[data-field="comment"]');
+        const commentToggle = onetimePanel.querySelector('[data-field="comment-toggle"]');
+        const commentBox = onetimePanel.querySelector('[data-field="comment"]');
         if (commentToggle && commentBox) {
             commentToggle.addEventListener('change', () => {
                 commentBox.classList.toggle('visible', commentToggle.checked);
             });
         }
 
-        const nextBtn = widgetCol.querySelector('[data-action="next"]');
+        const nextBtn = onetimePanel.querySelector('[data-action="next"]');
         if (nextBtn) {
             nextBtn.addEventListener('click', async () => {
                 const s = readWidgetState();
                 const line = buildReferenceLine(s);
-                const status = widgetCol.querySelector('[data-role="copy-status"]');
+                const status = onetimePanel.querySelector('[data-role="copy-status"]');
                 try {
                     await navigator.clipboard.writeText(line);
                     if (status) {
@@ -1379,6 +1763,119 @@
             });
         }
 
+        const recurringForm = widgetCol.querySelector('[data-form="recurring"]');
+        const recurringStatus = widgetCol.querySelector('[data-role="recurring-status"]');
+        const startingDateInput = widgetCol.querySelector('[name="startingDate"]');
+        if (startingDateInput && !startingDateInput.value) startingDateInput.value = today;
+
+        function markRecurringValidity(form) {
+            form.querySelectorAll('.tw-field, .tw-signature-field').forEach(w => w.classList.remove('tw-invalid'));
+            form.querySelectorAll(':invalid').forEach(el => {
+                const wrap = el.closest('.tw-field') || el.closest('.tw-signature-field');
+                if (wrap) wrap.classList.add('tw-invalid');
+            });
+            const sigVal = form.querySelector('[data-sig-value]')?.value || '';
+            if (!sigVal.startsWith('data:image/')) {
+                form.querySelector('.tw-signature-field')?.classList.add('tw-invalid');
+            }
+        }
+
+        function focusFirstRecurringInvalid(form) {
+            const sigInput = form.querySelector('[data-sig-value]');
+            const sigVal = sigInput?.value || '';
+            if (!sigVal.startsWith('data:image/')) {
+                const errBox = form.querySelector('[data-sig-error]');
+                if (errBox) errBox.textContent = 'Please draw or upload your signature.';
+                if (sigInput) {
+                    sigInput.setCustomValidity('Please draw or upload your signature.');
+                    sigInput.reportValidity();
+                }
+                form.querySelector('.tw-signature-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+            }
+            if (sigInput) sigInput.setCustomValidity('');
+            const first = form.querySelector(':invalid');
+            if (first) {
+                first.reportValidity();
+                first.focus({ preventScroll: true });
+                first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+            }
+            return false;
+        }
+
+        if (recurringForm) {
+            bindRecurringSignature(recurringForm);
+            recurringForm.querySelectorAll('input, select, textarea').forEach(el => {
+                el.addEventListener('input', () => {
+                    el.closest('.tw-field, .tw-signature-field')?.classList.remove('tw-invalid');
+                });
+                el.addEventListener('change', () => {
+                    el.closest('.tw-field, .tw-signature-field')?.classList.remove('tw-invalid');
+                });
+            });
+            recurringForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (recurringForm._sigSync) recurringForm._sigSync();
+                markRecurringValidity(recurringForm);
+                if (focusFirstRecurringInvalid(recurringForm)) return;
+                if (!recurringForm.checkValidity()) {
+                    markRecurringValidity(recurringForm);
+                    focusFirstRecurringInvalid(recurringForm);
+                    return;
+                }
+                const fd = new FormData(recurringForm);
+                const payload = {
+                    salutation: fd.get('salutation'),
+                    fullName: fd.get('fullName'),
+                    address: fd.get('address'),
+                    phone: fd.get('phone'),
+                    email: fd.get('email'),
+                    zipCity: fd.get('zipCity'),
+                    bankAccount: fd.get('bankAccount'),
+                    monthlyAmount: fd.get('monthlyAmount'),
+                    startingDate: fd.get('startingDate'),
+                    place: fd.get('place'),
+                    signatureDate: fd.get('signatureDate'),
+                    signature: fd.get('signature'),
+                    authorized: fd.get('authorized') === 'on',
+                };
+                const submitBtn = recurringForm.querySelector('[data-action="recurring-submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+                if (recurringStatus) {
+                    recurringStatus.className = 'tw-form-status';
+                    recurringStatus.textContent = 'Sending…';
+                }
+                try {
+                    const res = await fetch('/api/recurring-donation.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.error || 'Submission failed');
+                    }
+                    if (recurringStatus) {
+                        recurringStatus.className = 'tw-form-status success';
+                        recurringStatus.textContent = data.message || 'Thank you! Check your email for confirmation.';
+                    }
+                    recurringForm.reset();
+                    if (recurringForm._sigReset) recurringForm._sigReset();
+                    const sigDate = recurringForm.querySelector('[name="signatureDate"]');
+                    if (sigDate) sigDate.value = today;
+                } catch (err) {
+                    if (recurringStatus) {
+                        recurringStatus.className = 'tw-form-status error';
+                        recurringStatus.textContent = err.message || 'Could not submit. Please email info@shivatemple.nl.';
+                    }
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        }
+
+        bindSummaryUpdates();
         bindSummaryUpdates();
         updateSummary();
     }

@@ -56,8 +56,15 @@ $apiSrc = Join-Path $root "api"
 $apiDst = Join-Path $dist "api"
 if (Test-Path $apiSrc) {
     if (-not (Test-Path $apiDst)) { New-Item -ItemType Directory -Path $apiDst | Out-Null }
-    Copy-Item (Join-Path $apiSrc "*") $apiDst -Recurse -Force
-    Write-Host "  api/" -ForegroundColor Green
+    Get-ChildItem $apiSrc -File | Where-Object { $_.Name -ne 'sheets-config.example.php' } | ForEach-Object {
+        Copy-Item $_.FullName (Join-Path $apiDst $_.Name) -Force
+    }
+  Write-Host "  api/" -ForegroundColor Green
+}
+$sheetsConfig = Join-Path $root "api\sheets-config.php"
+if (Test-Path $sheetsConfig) {
+    Copy-Item $sheetsConfig (Join-Path $apiDst "sheets-config.php") -Force
+    Write-Host "  api/sheets-config.php" -ForegroundColor Green
 }
 
 # .htaccess for GoDaddy (Apache) - SPA fallback
